@@ -1,19 +1,13 @@
 __author__ = 'husser'
 ## To do : use the Flask API to fetch data
 
-from optparse import OptionParser
 import sys
+from optparse import OptionParser
+from textmining.workflows import SemanticAnalysisWorkflow
+from pymongo import MongoClient
+from config import MONGODB_SERVER_HOST, MONGODB_SERVER_PORT
 
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy import create_engine
-from textmining.workflows import MainWorkflow
-
-import pymongo
-
-engine = create_engine("sqlite:///data-dev.db")
-DBSession = sessionmaker()
-DBSession.configure(bind=engine)
-session = DBSession()
+mongoclient = MongoClient(MONGODB_SERVER_HOST, MONGODB_SERVER_PORT)
 
 op = OptionParser()
 op.add_option("--use_nmf",
@@ -32,7 +26,5 @@ else:
 print("Using reducer %s"%reducer)
 
 if __name__ == '__main__':
-    corpus = MainWorkflow().read_sql(session, Post, size_limit=2000)
-    corpus.run_main()
-    corpus.aggregate_map_data(n_topics=4, n_features=5)
-    corpus.store_in_mongo()
+    corpus = SemanticAnalysisWorkflow(mongoclient, "scrapy", "lemonde")
+    corpus.main()

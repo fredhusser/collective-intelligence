@@ -8,6 +8,8 @@ __author__ = 'husser'
 import numpy as np
 import pandas as pd
 import json
+from bson import json_util
+from bson.json_util import dumps
 from modelling import ModelTFIDF, ModelLSA, ModelNMF, ModelSOM, ModelWARD
 from .MLConfig import *
 
@@ -38,8 +40,37 @@ class Corpus(object):
         is fetched
     """
 
-    def read_mongo(self, MongoClient):
-        pass
+
+class SemanticAnalysisWorkflow(object):
+    """Basic workflow class for performing data analysis
+    it overrides the Corpus class in order to perform some
+    analysis on it. It provides an analysis
+    """
+    MONGO_DBNAME_OUT = "textmining"
+    MONGO_COLLECTION_OUT = "semantic"
+
+    def __init__(self, connection, dbname, collection):
+        self.attributes = {}
+        self.vectorize_ = None
+        self.reduce_ = None
+        self.classify_ = None
+        self.cluster_ = None
+        self.connection = connection
+        self.read_mongo(dbname,collection)
+
+    def read_mongo(self, dbname, collection):
+        """Data extractor from a mongo DB client
+        """
+        collection = self.connection[dbname][collection]
+        articles = collection.find(projection={"title": True, "body": True, "_id": False})
+
+        json_articles = []
+        for article in articles:
+            json_articles.append(article)
+        json_data = json.dumps(json_articles, default=json_util.default)
+        self.corpus_data = pd.read_json(json_data).drop_duplicates().dropna()
+        print self.corpus_data.head()
+        return self
 
     def read_sql(self, session, post_model, size_limit=None):
         """Data extractor from a SQLAlchemy session. Must
@@ -56,50 +87,36 @@ class Corpus(object):
         self.corpus_data = data_frame(query, columns=["title", "body"])
         return self
 
-
-class MainWorkflow(Corpus):
-    """Basic workflow class for performing data analysis
-    it overrides the Corpus class in order to perform some
-    analysis on it. It provides an analysis
-    """
-
-    def __init__(self, *args, **kwargs):
-        super(self.__class__, self).__init__(*args, **kwargs)
-        self.attributes = {}
-
     def log(self, msg):
         print(msg)
 
-    def run_main(self, reducer='nmf'):
+    def main(self):
         """Used as a main interface to the workflow class
         :param reducer:
         :return:
         """
-        self._run_vectorizer()
-        self._run_reduction(reducer=reducer)
-        self._run_classification()
-        return self
+        self.vectorizer().reducer().classifier()
+        self.aggregate_map_data(n_topics=4, n_features=5)
+        self.store_in_mongo(self.MONGO_DBNAME_OUT,self.MONGO_COLLECTION_OUT)
 
-    def _run_vectorizer(self):
+    def vectorizer(self):
         """Representation of the text data into the vector space model.
         """
         self.vectorize_ = ModelTFIDF(self.corpus_data.body, PARAMETERS_VECTORIZE).fit()
         self.attributes["corpus_size"] = self.vectorize_.training_set_size
         self.attributes["n_features"] = self.vectorize_.output_space_size
+        return self
 
-    def _run_reduction(self, reducer="nmf"):
+    def reducer(self):
         """Run the semantic analysis for topic modelling prior to data analysis
         """
-        if reducer == "nmf":
-            self.reduce_ = ModelNMF(self.vectorize_.output_data,
-                                    PARAMETERS_NMF).fit()
-        else:
-            self.reduce_ = ModelLSA(self.vectorize_.output_data,
+        self.reduce_ = ModelLSA(self.vectorize_.output_data,
                                     PARAMETERS_LSA).fit()
 
         self.attributes["n_topics"] = self.reduce_.output_space_size
+        return self
 
-    def _run_classification(self):
+    def classifier(self):
         """Sample pipeline for text vectorizing, reduction, classification
         and clustering
         """
@@ -113,9 +130,9 @@ class MainWorkflow(Corpus):
         self.cluster_ = ModelWARD(self.classify_.output_data,
                                   PARAMETERS_WARD).fit(self.classify_.model_attributes["kshape"])
         self.attributes["n_clusters"] = self.cluster_.model_attributes["n_clusters"]
+        return self
 
     ### Methods for data retrieval ###
-
     def getTokensByTopic(self, topic_id, n_words):
         """Get the top features for a given topic
         Return
@@ -164,14 +181,12 @@ class MainWorkflow(Corpus):
                  "topic_id": int(topic_id)} for index, topic_id in enumerate(sorted_)]
 
     ### Retrieve SOM Nodes ###
-
     def getNodeIdByCluster(self, cluster_id):
         """ Gives for a given cluster the list of nodes.
         """
         return np.where(self.cluster_.mapper_data == cluster_id)[0]
 
-        ### Retrieve Articles ###
-
+    ### Retrieve Articles ###
     def getArticlesIdByTopic(self, topic_id, n_articles):
         """Get the top articles per topic
         """
@@ -210,8 +225,8 @@ class MainWorkflow(Corpus):
         df = self.corpus_data
         n_cols = self.attributes["kshape"][1]
         index = self.corpus_data.index.values
-        #df.body = df.body.s
-        #df.title = df.title.str.encode("utf8")
+        # df.body = df.body.s
+        # df.title = df.title.str.encode("utf8")
 
         df["node"] = self.classify_.mapper_data[index]
         df["x"] = np.divide(index, n_cols).astype('int')
@@ -220,7 +235,7 @@ class MainWorkflow(Corpus):
         df["topics"] = np.array([json.dumps(self.getTokensByNode(
             df["node"].ix[ix],
             n_features,
-            n_topics))for ix in index])
+            n_topics)) for ix in index])
         return df
 
     def aggregate_map_data(self, n_topics=2, n_features=5):
@@ -239,20 +254,10 @@ class MainWorkflow(Corpus):
         self.nodes_data = pd.DataFrame(data, columns=["node", "x", "y", "cluster"])
         for topic in xrange(n_topics):
             self.nodes_data["topic_%d" % (1 + topic)] = \
-                json.dumps(self.getTokensByNode(topic, n_features,n_topics))
-        self.nodes_data["hits"] = self.corpus_data.groupby("node").size()
+                json.dumps(self.getTokensByNode(topic, n_features, n_topics))
+        self.nodes_data["hits"] = self.nodes_data.groupby("node").size()
         self.nodes_data.fillna(0, inplace=True)
         return self.nodes_data
-
-    def get_coordinates(self, node_id):
-        """
-
-        :rtype : tuple(int,int)
-        """
-        n_cols = self.attributes["kshape"][1]
-        x = int(np.divide(node_id, n_cols))
-        y = int(node_id % n_cols)
-        return x, y
 
     def print_featuresByTopic(self, topic_id, n_features):
         tokens = self.getTokensByTopic(topic_id, 10)
@@ -263,29 +268,14 @@ class MainWorkflow(Corpus):
         for doc_id in self.getArticlesIdByTopic(topic_id, n_articles):
             self.log("%d\t %s" % (doc_id, self.corpus_data.title[doc_id]))
 
-    def store_in_HDF(self, store_uri='./store.h5', directory='data'):
-        """Function to store the data of the analysis in a HDF store for
-        use in the server application
-        """
-
-        self.attributes.update(
-            {'x_shape': self.attributes['kshape'][0],
-             'y_shape': self.attributes['kshape'][1],
-             'kshape': str(self.attributes['kshape']),
-             })
-
-        with pd.HDFStore(store_uri) as store:
-            store.put('data/corpus_data', self.corpus_data, append=False, format='table')
-            store.put('data/nodes_data', self.nodes_data, append=False, format='table')
-            context = pd.DataFrame(self.attributes, index=["data"])
-            context.to_hdf(store, "context", append=True, format='table')
-
-    def store_in_mongo(self):
+    def store_in_mongo(self, db_name, collection):
         """Function to store the data in the Mongo DB for use as data source for
-        visualization"""
-        from config import MongoConfig
+        visualization
+        :param db_name: Database for the subproject
+        :param collection: Current collection in which data is stored
+        """
         from datetime import datetime
-        collection = MongoConfig().collection
+        collection = self.connection[db_name][collection]
 
         # Hierarchical Data Base
         session = {
@@ -302,7 +292,8 @@ class MainWorkflow(Corpus):
         n_topics = self.attributes["n_topics"]
         # Add the nodes data
         for node_id in xrange(n_nodes):
-            coords = self.get_coordinates(node_id=node_id)
+            coords = (int(np.divide(node_id, self.attributes["kshape"][1])),
+                      int(node_id % self.attributes["kshape"][1]))
             articles = self.getArticlesIdByNode(node_id=node_id)
             topics = self.getTokensByNode(node_id=node_id, max_features=10, max_topics=5)
             node = {
@@ -311,7 +302,7 @@ class MainWorkflow(Corpus):
                                 "y_shape": coords[1]},
                 "article_hits": len(articles),
                 "articles": articles.tolist(),
-                "topics":topics,
+                "topics": topics,
             }
             session["nodes"].append(node)
 
@@ -326,18 +317,12 @@ class MainWorkflow(Corpus):
         collection.insert_one(session)
 
 
-
-def load_from_hdf(h5_store):
-    """Load the two dataframes from the HDF store.
-
-    :param h5_store:
-    :return:
+class Workflow_NMF(SemanticAnalysisWorkflow):
+    """Implementation of the semantic analysis with the Non-negative matrix factorization
+    approach instead of the latent semantic analysis
     """
-    store = pd.HDFStore(h5_store)
-    corpus_data = pd.read_hdf(store, "data/corpus_data")
-    nodes_data = pd.read_hdf(store, "data/nodes_data")
-    context = pd.read_hdf(store, "context")
-    return corpus_data, nodes_data
-
-
-
+    def reducer(self):
+        self.reduce_ = ModelNMF(self.vectorize_.output_data,
+                        PARAMETERS_NMF).fit()
+        self.attributes["n_topics"] = self.reduce_.output_space_size
+        return self
