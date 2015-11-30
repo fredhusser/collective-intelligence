@@ -1,0 +1,26 @@
+{
+  "name": "flask-app",
+  "authors": [
+    "husser <fredhusser@gmail.com>"
+  ],
+  "description": "",
+  "main": "manage.py",
+  "moduleType": [
+    "node"
+  ],
+  "license": "MIT",
+  "homepage": "",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests",
+    "app/static/bower_components"
+  ],
+  "dependencies": {
+    "d3": "~3.5.9",
+    "jquery": "~2.1.4",
+    "bootstrap": "~3.3.5"
+  }
+}

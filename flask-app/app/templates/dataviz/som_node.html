@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% import "bootstrap/wtf.html" as wtf %}
+{% import "_macros.html" as macros %}
+
+{% block title %}Node {{node['id']}} {% endblock %}
+
+{% block page_content %}
+<div class="page-header">
+    <h1>Browse Node Content</h1>
+
+    <p>Node {{node['id']}}</p>
+</div>
+
+<div class="row">
+    <div class="col-xs-6">
+        <h2>Topics of the node</h2>
+        <table>
+            <thead>
+            <tr>
+                <th>Topic No</th>
+                <th>Weight</th>
+                <th>Tokens</th>
+            </tr>
+            </thead>
+            <tbody>
+
+            {% for topic in node.topics %}
+            <tr style="white-space:nowrap;">
+                <td> {{topic.rank}}</td>
+                <td> {{topic.weight}}</td>
+                <td>
+                    {% for token in topic.tokens %}
+                    <a> {{token.name}}</a>
+                    {% endfor %}
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="col-xs-12">
+        <h1>Posts of the node</h1>
+        {% for post in posts %}
+        <h2>{{post.title}}</h2>
+
+        <p>{{post.body}}</p>
+        {% endfor %}
+    </div>
+</div>
+
+{% endblock %}

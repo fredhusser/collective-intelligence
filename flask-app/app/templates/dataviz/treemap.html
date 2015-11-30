@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% import "bootstrap/wtf.html" as wtf %}
+{% import "_macros.html" as macros %}
+
+{% block page_content %}
+<head>
+    <meta charset="UTF-8">
+    <title></title>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
+    <script type="text/javascript" src="static/bower_components/d3/d3.js"></script>
+
+</head>
+<body>
+<div id="chart"></div>
+</body>
+
+<script>
+    //Function to call when you mouseover a node
+    function mover(d) {
+        var el = d3.select(this)
+                        .transition()
+                        .duration(10)
+                        .style("fill-opacity", 0.3);
+    }
+
+    //Mouseout function
+    function mout(d) {
+        var el = d3.select(this)
+                        .transition()
+                        .duration(1000)
+                        .style("fill-opacity", 1);
+    };
+
+    // Define identity (1:1) scales
+    var x = d3.scale.identity().domain([0, 450]);
+    var y = d3.scale.identity().domain([0, 300]);
+
+    // Define container
+    var chart = d3.select("body")
+            .append("svg")
+            .attr("class", "chart")
+            .attr("width", 490)
+            .attr("height", 330)
+            .append("g")
+        // move 0,0 slightly down and right to accomodate axes
+            .attr("transform", "translate(30,20)");
+
+    // Draw X-axis grid lines
+    chart.selectAll("line.x")
+            .data(x.ticks(10))
+            .enter().append("line")
+            .attr("class", "x")
+            .attr("x1", x)
+            .attr("x2", x)
+            .attr("y1", 0)
+            .attr("y2", 300)
+            .style("stroke", "#ccc");
+
+    // Draw Y-axis grid lines
+    chart.selectAll("line.y")
+            .data(y.ticks(10))
+            .enter().append("line")
+            .attr("class", "y")
+            .attr("x1", 0)
+            .attr("x2", 450)
+            .attr("y1", y)
+            .attr("y2", y)
+            .style("stroke", "#ccc");
+
+
+    chart.append('g')
+            .attr("class", "axis")
+            .call(xAxis);
+
+    chart.append('g')
+            .attr("class", "axis")
+            .call(yAxis);
+
+    //Start drawing the hexagons
+    svg.append("g")
+            .selectAll(".hexagon")
+            .data(hexbin(points))
+            .enter().append("path")
+            .attr("class", "hexagon")
+            .attr("d", function (d) {
+                return "M" + d.x + "," + d.y + hexbin.hexagon();
+            })
+            .attr("stroke", function (d, i) {
+                return "#fff";
+            })
+            .attr("stroke-width", "1px")
+            .style("fill", function (d, i) {
+                return color[i];
+            })
+            .on("mouseover", mover)
+            .on("mouseout", mout)
+    ;
+</script>
+{% endblock %}

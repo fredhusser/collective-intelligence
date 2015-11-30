@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% import "bootstrap/wtf.html" as wtf %}
+{% import "_macros.html" as macros %}
+
+{% block title %}Analysis Page{% endblock %}
+
+{% block page_content %}
+    {{ wtf.quick_form(form) }}
+{% endblock %}
