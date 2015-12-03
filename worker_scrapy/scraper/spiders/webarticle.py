@@ -24,7 +24,7 @@ class LeMondeSpider(CrawlSpider):
         #'Author': './/article/p[@class="bloc_signature"]/span[@class="signature_article"]/span[@itemprop="author"]/a.text()',
         #'Publisher': './/article/p[@class="bloc_signature"]/span[@id="publisher"]/text()',
         'timestamp': './/article/p[@class="bloc_signature"]/time[@itemprop="datePublished"]/@datetime',
-        'body': './/article/div[@id="articleBody"]/p/text()',
+        'body': './/article/div[@id="articleBody"]/*',
     }
     
     rules = (

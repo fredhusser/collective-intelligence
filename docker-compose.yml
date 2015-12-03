@@ -6,7 +6,7 @@ flaskapp:
     - mongo
   volumes:
     - "/vagrant/flask-app:/opt/flask-app"
-  env_file: .env
+  env_file: "flask-app/.env"
 
 mongo:
   restart: always

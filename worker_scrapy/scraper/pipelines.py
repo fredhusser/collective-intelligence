@@ -1,9 +1,12 @@
 from scrapy.exceptions import DropItem
 from scrapy.conf import settings
 from scrapy import log
+import bleach
 import datetime
 import pymongo
 import re
+
+tags = ['h2', 'p', 'em', 'strong']
 
 class WebArticlesPipeline(object):
     """A pipeline for storing scraped items in the database"""
@@ -21,6 +24,7 @@ class WebArticlesPipeline(object):
         """This method is called for every item pipeline component.
         """
         item["timestamp"]=item["timestamp"].split("+")[0]
+        item["body"]=bleach.clean(item["body"], tags, strip=True)
         valid = True
 
         for data in item:

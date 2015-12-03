@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="post-tabs">
+    <h1> {{ post.title }} </h1>
+</div>
+
+<div class="post-date">
+    {{ post.timestamp }}
+</div>
+
+<div class="post-body">
+    {{post.body | safe}}
+</div>
+{% endblock %}
